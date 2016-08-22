@@ -6,16 +6,13 @@
  * LICENSE file in the root directory of this source tree. An additional grant
  * of patent rights can be found in the PATENTS file in the same directory.
  *
- * @providesModule ReactDOMInstrumentation
+ * @providesModule ReactPropTypesSecret
  */
+
 
 'use strict';
 
-var debugTool = null;
 
-if (__DEV__) {
-  var ReactDOMDebugTool = require('ReactDOMDebugTool');
-  debugTool = ReactDOMDebugTool;
-}
+const ReactPropTypesSecret = 'SECRET_DO_NOT_PASS_THIS_OR_YOU_WILL_BE_FIRED';
 
-module.exports = {debugTool};
+module.exports = ReactPropTypesSecret;

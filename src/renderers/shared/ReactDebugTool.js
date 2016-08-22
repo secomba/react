@@ -11,33 +11,40 @@
 
 'use strict';
 
-var ReactInvalidSetStateWarningDevTool = require('ReactInvalidSetStateWarningDevTool');
-var ReactHostOperationHistoryDevtool = require('ReactHostOperationHistoryDevtool');
-var ReactComponentTreeDevtool = require('ReactComponentTreeDevtool');
+var ReactInvalidSetStateWarningHook = require('ReactInvalidSetStateWarningHook');
+var ReactHostOperationHistoryHook = require('ReactHostOperationHistoryHook');
+var ReactComponentTreeHook = require('ReactComponentTreeHook');
+var ReactChildrenMutationWarningHook = require('ReactChildrenMutationWarningHook');
 var ExecutionEnvironment = require('ExecutionEnvironment');
 
 var performanceNow = require('performanceNow');
 var warning = require('warning');
 
-var eventHandlers = [];
-var handlerDoesThrowForEvent = {};
+var hooks = [];
+var didHookThrowForEvent = {};
 
-function emitEvent(handlerFunctionName, arg1, arg2, arg3, arg4, arg5) {
-  eventHandlers.forEach(function(handler) {
-    try {
-      if (handler[handlerFunctionName]) {
-        handler[handlerFunctionName](arg1, arg2, arg3, arg4, arg5);
-      }
-    } catch (e) {
-      warning(
-        handlerDoesThrowForEvent[handlerFunctionName],
-        'exception thrown by devtool while handling %s: %s',
-        handlerFunctionName,
-        e + '\n' + e.stack
-      );
-      handlerDoesThrowForEvent[handlerFunctionName] = true;
+function callHook(event, fn, context, arg1, arg2, arg3, arg4, arg5) {
+  try {
+    fn.call(context, arg1, arg2, arg3, arg4, arg5);
+  } catch (e) {
+    warning(
+      didHookThrowForEvent[event],
+      'Exception thrown by hook while handling %s: %s',
+      event,
+      e + '\n' + e.stack
+    );
+    didHookThrowForEvent[event] = true;
+  }
+}
+
+function emitEvent(event, arg1, arg2, arg3, arg4, arg5) {
+  for (var i = 0; i < hooks.length; i++) {
+    var hook = hooks[i];
+    var fn = hook[event];
+    if (fn) {
+      callHook(event, fn, hook, arg1, arg2, arg3, arg4, arg5);
     }
-  });
+  }
 }
 
 var isProfiling = false;
@@ -51,22 +58,24 @@ var currentTimerStartTime = null;
 var currentTimerNestedFlushDuration = null;
 var currentTimerType = null;
 
+var lifeCycleTimerHasWarned = false;
+
 function clearHistory() {
-  ReactComponentTreeDevtool.purgeUnmountedComponents();
-  ReactHostOperationHistoryDevtool.clearHistory();
+  ReactComponentTreeHook.purgeUnmountedComponents();
+  ReactHostOperationHistoryHook.clearHistory();
 }
 
 function getTreeSnapshot(registeredIDs) {
   return registeredIDs.reduce((tree, id) => {
-    var ownerID = ReactComponentTreeDevtool.getOwnerID(id);
-    var parentID = ReactComponentTreeDevtool.getParentID(id);
+    var ownerID = ReactComponentTreeHook.getOwnerID(id);
+    var parentID = ReactComponentTreeHook.getParentID(id);
     tree[id] = {
-      displayName: ReactComponentTreeDevtool.getDisplayName(id),
-      text: ReactComponentTreeDevtool.getText(id),
-      updateCount: ReactComponentTreeDevtool.getUpdateCount(id),
-      childIDs: ReactComponentTreeDevtool.getChildIDs(id),
+      displayName: ReactComponentTreeHook.getDisplayName(id),
+      text: ReactComponentTreeHook.getText(id),
+      updateCount: ReactComponentTreeHook.getUpdateCount(id),
+      childIDs: ReactComponentTreeHook.getChildIDs(id),
       // Text nodes don't have owners but this is close enough.
-      ownerID: ownerID || ReactComponentTreeDevtool.getOwnerID(parentID),
+      ownerID: ownerID || ReactComponentTreeHook.getOwnerID(parentID),
       parentID,
     };
     return tree;
@@ -76,7 +85,7 @@ function getTreeSnapshot(registeredIDs) {
 function resetMeasurements() {
   var previousStartTime = currentFlushStartTime;
   var previousMeasurements = currentFlushMeasurements || [];
-  var previousOperations = ReactHostOperationHistoryDevtool.getHistory();
+  var previousOperations = ReactHostOperationHistoryHook.getHistory();
 
   if (currentFlushNesting === 0) {
     currentFlushStartTime = null;
@@ -86,7 +95,7 @@ function resetMeasurements() {
   }
 
   if (previousMeasurements.length || previousOperations.length) {
-    var registeredIDs = ReactComponentTreeDevtool.getRegisteredIDs();
+    var registeredIDs = ReactComponentTreeHook.getRegisteredIDs();
     flushHistory.push({
       duration: performanceNow() - previousStartTime,
       measurements: previousMeasurements || [],
@@ -100,23 +109,31 @@ function resetMeasurements() {
   currentFlushMeasurements = [];
 }
 
-function checkDebugID(debugID) {
-  warning(debugID, 'ReactDebugTool: debugID may not be empty.');
+function checkDebugID(debugID, allowRoot = false) {
+  if (allowRoot && debugID === 0) {
+    return;
+  }
+  if (!debugID) {
+    warning(false, 'ReactDebugTool: debugID may not be empty.');
+  }
 }
 
 function beginLifeCycleTimer(debugID, timerType) {
   if (currentFlushNesting === 0) {
     return;
   }
-  warning(
-    !currentTimerType,
-    'There is an internal error in the React performance measurement code. ' +
-    'Did not expect %s timer to start while %s timer is still in ' +
-    'progress for %s instance.',
-    timerType,
-    currentTimerType || 'no',
-    (debugID === currentTimerDebugID) ? 'the same' : 'another'
-  );
+  if (currentTimerType && !lifeCycleTimerHasWarned) {
+    warning(
+      false,
+      'There is an internal error in the React performance measurement code. ' +
+      'Did not expect %s timer to start while %s timer is still in ' +
+      'progress for %s instance.',
+      timerType,
+      currentTimerType || 'no',
+      (debugID === currentTimerDebugID) ? 'the same' : 'another'
+    );
+    lifeCycleTimerHasWarned = true;
+  }
   currentTimerStartTime = performanceNow();
   currentTimerNestedFlushDuration = 0;
   currentTimerDebugID = debugID;
@@ -127,15 +144,18 @@ function endLifeCycleTimer(debugID, timerType) {
   if (currentFlushNesting === 0) {
     return;
   }
-  warning(
-    currentTimerType === timerType,
-    'There is an internal error in the React performance measurement code. ' +
-    'We did not expect %s timer to stop while %s timer is still in ' +
-    'progress for %s instance. Please report this as a bug in React.',
-    timerType,
-    currentTimerType || 'no',
-    (debugID === currentTimerDebugID) ? 'the same' : 'another'
-  );
+  if (currentTimerType !== timerType && !lifeCycleTimerHasWarned) {
+    warning(
+      false,
+      'There is an internal error in the React performance measurement code. ' +
+      'We did not expect %s timer to stop while %s timer is still in ' +
+      'progress for %s instance. Please report this as a bug in React.',
+      timerType,
+      currentTimerType || 'no',
+      (debugID === currentTimerDebugID) ? 'the same' : 'another'
+    );
+    lifeCycleTimerHasWarned = true;
+  }
   if (isProfiling) {
     currentFlushMeasurements.push({
       timerType,
@@ -173,13 +193,13 @@ function resumeCurrentLifeCycleTimer() {
 }
 
 var ReactDebugTool = {
-  addDevtool(devtool) {
-    eventHandlers.push(devtool);
+  addHook(hook) {
+    hooks.push(hook);
   },
-  removeDevtool(devtool) {
-    for (var i = 0; i < eventHandlers.length; i++) {
-      if (eventHandlers[i] === devtool) {
-        eventHandlers.splice(i, 1);
+  removeHook(hook) {
+    for (var i = 0; i < hooks.length; i++) {
+      if (hooks[i] === hook) {
+        hooks.splice(i, 1);
         i--;
       }
     }
@@ -195,7 +215,7 @@ var ReactDebugTool = {
     isProfiling = true;
     flushHistory.length = 0;
     resetMeasurements();
-    ReactDebugTool.addDevtool(ReactHostOperationHistoryDevtool);
+    ReactDebugTool.addHook(ReactHostOperationHistoryHook);
   },
   endProfiling() {
     if (!isProfiling) {
@@ -204,7 +224,7 @@ var ReactDebugTool = {
 
     isProfiling = false;
     resetMeasurements();
-    ReactDebugTool.removeDevtool(ReactHostOperationHistoryDevtool);
+    ReactDebugTool.removeHook(ReactHostOperationHistoryHook);
   },
   getFlushHistory() {
     return flushHistory;
@@ -231,14 +251,6 @@ var ReactDebugTool = {
     endLifeCycleTimer(debugID, timerType);
     emitEvent('onEndLifeCycleTimer', debugID, timerType);
   },
-  onBeginReconcilerTimer(debugID, timerType) {
-    checkDebugID(debugID);
-    emitEvent('onBeginReconcilerTimer', debugID, timerType);
-  },
-  onEndReconcilerTimer(debugID, timerType) {
-    checkDebugID(debugID);
-    emitEvent('onEndReconcilerTimer', debugID, timerType);
-  },
   onError(debugID) {
     if (currentTimerDebugID != null) {
       endLifeCycleTimer(currentTimerDebugID, currentTimerType);
@@ -258,34 +270,15 @@ var ReactDebugTool = {
   onSetState() {
     emitEvent('onSetState');
   },
-  onSetDisplayName(debugID, displayName) {
-    checkDebugID(debugID);
-    emitEvent('onSetDisplayName', debugID, displayName);
-  },
   onSetChildren(debugID, childDebugIDs) {
     checkDebugID(debugID);
     childDebugIDs.forEach(checkDebugID);
     emitEvent('onSetChildren', debugID, childDebugIDs);
   },
-  onSetOwner(debugID, ownerDebugID) {
+  onBeforeMountComponent(debugID, element, parentDebugID) {
     checkDebugID(debugID);
-    emitEvent('onSetOwner', debugID, ownerDebugID);
-  },
-  onSetParent(debugID, parentDebugID) {
-    checkDebugID(debugID);
-    emitEvent('onSetParent', debugID, parentDebugID);
-  },
-  onSetText(debugID, text) {
-    checkDebugID(debugID);
-    emitEvent('onSetText', debugID, text);
-  },
-  onMountRootComponent(debugID) {
-    checkDebugID(debugID);
-    emitEvent('onMountRootComponent', debugID);
-  },
-  onBeforeMountComponent(debugID, element) {
-    checkDebugID(debugID);
-    emitEvent('onBeforeMountComponent', debugID, element);
+    checkDebugID(parentDebugID, true);
+    emitEvent('onBeforeMountComponent', debugID, element, parentDebugID);
   },
   onMountComponent(debugID) {
     checkDebugID(debugID);
@@ -299,6 +292,10 @@ var ReactDebugTool = {
     checkDebugID(debugID);
     emitEvent('onUpdateComponent', debugID);
   },
+  onBeforeUnmountComponent(debugID) {
+    checkDebugID(debugID);
+    emitEvent('onBeforeUnmountComponent', debugID);
+  },
   onUnmountComponent(debugID) {
     checkDebugID(debugID);
     emitEvent('onUnmountComponent', debugID);
@@ -308,8 +305,13 @@ var ReactDebugTool = {
   },
 };
 
-ReactDebugTool.addDevtool(ReactInvalidSetStateWarningDevTool);
-ReactDebugTool.addDevtool(ReactComponentTreeDevtool);
+// TODO remove these when RN/www gets updated
+ReactDebugTool.addDevtool = ReactDebugTool.addHook;
+ReactDebugTool.removeDevtool = ReactDebugTool.removeHook;
+
+ReactDebugTool.addHook(ReactInvalidSetStateWarningHook);
+ReactDebugTool.addHook(ReactComponentTreeHook);
+ReactDebugTool.addHook(ReactChildrenMutationWarningHook);
 var url = (ExecutionEnvironment.canUseDOM && window.location.href) || '';
 if ((/[?&]react_perf\b/).test(url)) {
   ReactDebugTool.beginProfiling();
