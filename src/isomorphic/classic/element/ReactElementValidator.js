@@ -19,9 +19,8 @@
 'use strict';
 
 var ReactCurrentOwner = require('ReactCurrentOwner');
-var ReactComponentTreeDevtool = require('ReactComponentTreeDevtool');
+var ReactComponentTreeHook = require('ReactComponentTreeHook');
 var ReactElement = require('ReactElement');
-var ReactPropTypeLocations = require('ReactPropTypeLocations');
 
 var checkReactTypeSpec = require('checkReactTypeSpec');
 
@@ -104,7 +103,7 @@ function validateExplicitKey(element, parentType) {
     '%s%s See https://fb.me/react-warning-keys for more information.%s',
     currentComponentErrorInfo,
     childOwner,
-    ReactComponentTreeDevtool.getCurrentStackAddendum(element)
+    ReactComponentTreeHook.getCurrentStackAddendum(element)
   );
 }
 
@@ -166,7 +165,7 @@ function validatePropTypes(element) {
     checkReactTypeSpec(
       componentClass.propTypes,
       element.props,
-      ReactPropTypeLocations.prop,
+      'prop',
       name,
       element,
       null
@@ -187,13 +186,15 @@ var ReactElementValidator = {
     var validType = typeof type === 'string' || typeof type === 'function';
     // We warn in this case but don't throw. We expect the element creation to
     // succeed and there will likely be errors in render.
-    warning(
-      validType,
-      'React.createElement: type should not be null, undefined, boolean, or ' +
-        'number. It should be a string (for DOM elements) or a ReactClass ' +
-        '(for composite components).%s',
-      getDeclarationErrorAddendum()
-    );
+    if (!validType) {
+      warning(
+        false,
+        'React.createElement: type should not be null, undefined, boolean, or ' +
+          'number. It should be a string (for DOM elements) or a ReactClass ' +
+          '(for composite components).%s',
+        getDeclarationErrorAddendum()
+      );
+    }
 
     var element = ReactElement.createElement.apply(this, arguments);
 

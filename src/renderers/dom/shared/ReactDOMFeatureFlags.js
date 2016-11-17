@@ -13,6 +13,7 @@
 
 var ReactDOMFeatureFlags = {
   useCreateElement: false,
+  useFiber: false,
 };
 
 module.exports = ReactDOMFeatureFlags;

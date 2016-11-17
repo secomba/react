@@ -17,26 +17,26 @@
 var React;
 var ReactTestUtils;
 
-describe('ReactChildReconciler', function() {
+describe('ReactChildReconciler', () => {
   function normalizeCodeLocInfo(str) {
     return str.replace(/\(at .+?:\d+\)/g, '(at **)');
   }
 
-  beforeEach(function() {
+  beforeEach(() => {
     jest.resetModuleRegistry();
 
     React = require('React');
     ReactTestUtils = require('ReactTestUtils');
   });
 
-  it('warns for duplicated keys', function() {
+  it('warns for duplicated keys', () => {
     spyOn(console, 'error');
 
-    var Component = React.createClass({
+    class Component extends React.Component {
       render() {
         return <div>{[<div key="1" />, <div key="1" />]}</div>;
-      },
-    });
+      }
+    }
 
     ReactTestUtils.renderIntoDocument(<Component />);
 
@@ -46,26 +46,26 @@ describe('ReactChildReconciler', function() {
     );
   });
 
-  it('warns for duplicated keys with component stack info', function() {
+  it('warns for duplicated keys with component stack info', () => {
     spyOn(console, 'error');
 
-    var Component = React.createClass({
-      render: function() {
+    class Component extends React.Component {
+      render() {
         return <div>{[<div key="1" />, <div key="1" />]}</div>;
-      },
-    });
+      }
+    }
 
-    var Parent = React.createClass({
-      render: function() {
+    class Parent extends React.Component {
+      render() {
         return React.cloneElement(this.props.child);
-      },
-    });
+      }
+    }
 
-    var GrandParent = React.createClass({
-      render: function() {
+    class GrandParent extends React.Component {
+      render() {
         return <Parent child={<Component />} />;
-      },
-    });
+      }
+    }
 
     ReactTestUtils.renderIntoDocument(<GrandParent />);
 

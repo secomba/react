@@ -27,32 +27,32 @@ var expectSingleChildlessDiv;
  * abstraction, `ReactCompositeComponent` does not ever add superfluous DOM
  * nodes.
  */
-describe('ReactCompositeComponentDOMMinimalism', function() {
+describe('ReactCompositeComponentDOMMinimalism', () => {
 
-  beforeEach(function() {
+  beforeEach(() => {
     reactComponentExpect = require('reactComponentExpect');
     React = require('React');
     ReactTestUtils = require('ReactTestUtils');
 
-    LowerLevelComposite = React.createClass({
-      render: function() {
+    LowerLevelComposite = class extends React.Component {
+      render() {
         return (
           <div>
             {this.props.children}
           </div>
         );
-      },
-    });
+      }
+    };
 
-    MyCompositeComponent = React.createClass({
-      render: function() {
+    MyCompositeComponent = class extends React.Component {
+      render() {
         return (
           <LowerLevelComposite>
             {this.props.children}
           </LowerLevelComposite>
         );
-      },
-    });
+      }
+    };
 
     expectSingleChildlessDiv = function(instance) {
       reactComponentExpect(instance)
@@ -64,7 +64,7 @@ describe('ReactCompositeComponentDOMMinimalism', function() {
     };
   });
 
-  it('should not render extra nodes for non-interpolated text', function() {
+  it('should not render extra nodes for non-interpolated text', () => {
     var instance = (
       <MyCompositeComponent>
         A string child
@@ -74,7 +74,7 @@ describe('ReactCompositeComponentDOMMinimalism', function() {
     expectSingleChildlessDiv(instance);
   });
 
-  it('should not render extra nodes for non-interpolated text', function() {
+  it('should not render extra nodes for non-interpolated text', () => {
     var instance = (
       <MyCompositeComponent>
         {'Interpolated String Child'}
@@ -84,7 +84,7 @@ describe('ReactCompositeComponentDOMMinimalism', function() {
     expectSingleChildlessDiv(instance);
   });
 
-  it('should not render extra nodes for non-interpolated text', function() {
+  it('should not render extra nodes for non-interpolated text', () => {
     var instance = (
       <MyCompositeComponent>
         <ul>

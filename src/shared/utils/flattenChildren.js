@@ -16,6 +16,21 @@ var KeyEscapeUtils = require('KeyEscapeUtils');
 var traverseAllChildren = require('traverseAllChildren');
 var warning = require('warning');
 
+var ReactComponentTreeHook;
+
+if (
+  typeof process !== 'undefined' &&
+  process.env &&
+  process.env.NODE_ENV === 'test'
+) {
+  // Temporary hack.
+  // Inline requires don't work well with Jest:
+  // https://github.com/facebook/react/issues/7240
+  // Remove the inline requires when we don't need them anymore:
+  // https://github.com/facebook/react/pull/7178
+  ReactComponentTreeHook = require('ReactComponentTreeHook');
+}
+
 /**
  * @param {function} traverseContext Context passed through traversal.
  * @param {?ReactComponent} child React child component.
@@ -33,15 +48,19 @@ function flattenSingleChildIntoContext(
     const result = traverseContext;
     const keyUnique = (result[name] === undefined);
     if (__DEV__) {
-      var ReactComponentTreeDevtool = require('ReactComponentTreeDevtool');
-      warning(
-        keyUnique,
-        'flattenChildren(...): Encountered two children with the same key, ' +
-        '`%s`. Child keys must be unique; when two children share a key, only ' +
-        'the first child will be used.%s',
-        KeyEscapeUtils.unescape(name),
-        ReactComponentTreeDevtool.getStackAddendumByID(selfDebugID)
-      );
+      if (!ReactComponentTreeHook) {
+        ReactComponentTreeHook = require('ReactComponentTreeHook');
+      }
+      if (!keyUnique) {
+        warning(
+          false,
+          'flattenChildren(...): Encountered two children with the same key, ' +
+          '`%s`. Child keys must be unique; when two children share a key, only ' +
+          'the first child will be used.%s',
+          KeyEscapeUtils.unescape(name),
+          ReactComponentTreeHook.getStackAddendumByID(selfDebugID)
+        );
+      }
     }
     if (keyUnique && child != null) {
       result[name] = child;

@@ -90,6 +90,10 @@ module.exports = function(grunt) {
   grunt.registerTask('npm-react-addons:release', npmReactAddonsTasks.buildReleases);
   grunt.registerTask('npm-react-addons:pack', npmReactAddonsTasks.packReleases);
 
+  var npmReactTestRendererTasks = require('./grunt/tasks/npm-react-test');
+  grunt.registerTask('npm-react-test:release', npmReactTestRendererTasks.buildRelease);
+  grunt.registerTask('npm-react-test:pack', npmReactTestRendererTasks.packRelease);
+
   grunt.registerTask('version-check', function() {
     // Use gulp here.
     spawnGulp(['version-check'], null, this.async());
@@ -113,12 +117,41 @@ module.exports = function(grunt) {
     'build-modules',
     'browserify:addonsMin',
   ]);
+  grunt.registerTask('build:dom', [
+    'build-modules',
+    'version-check',
+    'browserify:dom',
+  ]);
+  grunt.registerTask('build:dom-min', [
+    'build-modules',
+    'version-check',
+    'browserify:domMin',
+  ]);
+  grunt.registerTask('build:dom-server', [
+    'build-modules',
+    'version-check',
+    'browserify:domServer',
+  ]);
+  grunt.registerTask('build:dom-server-min', [
+    'build-modules',
+    'version-check',
+    'browserify:domServerMin',
+  ]);
+  grunt.registerTask('build:dom-fiber', [
+    'build-modules',
+    'version-check',
+    'browserify:domFiber',
+  ]);
+  grunt.registerTask('build:dom-fiber-min', [
+    'build-modules',
+    'version-check',
+    'browserify:domFiberMin',
+  ]);
   grunt.registerTask('build:npm-react', [
     'version-check',
     'build-modules',
     'npm-react:release',
   ]);
-  grunt.registerTask('build:react-dom', require('./grunt/tasks/react-dom'));
 
   var jestTasks = require('./grunt/tasks/jest');
   grunt.registerTask('jest:normal', jestTasks.normal);
@@ -137,7 +170,12 @@ module.exports = function(grunt) {
     'browserify:addons',
     'browserify:min',
     'browserify:addonsMin',
-    'build:react-dom',
+    'browserify:dom',
+    'browserify:domMin',
+    'browserify:domServer',
+    'browserify:domServerMin',
+    'browserify:domFiber',
+    'browserify:domFiberMin',
     'npm-react:release',
     'npm-react:pack',
     'npm-react-dom:release',
@@ -146,6 +184,8 @@ module.exports = function(grunt) {
     'npm-react-native:pack',
     'npm-react-addons:release',
     'npm-react-addons:pack',
+    'npm-react-test:release',
+    'npm-react-test:pack',
     'compare_size',
   ]);
 

@@ -15,14 +15,14 @@ var React;
 var ReactDOM;
 var ReactTestUtils;
 
-describe('ReactComponent', function() {
-  beforeEach(function() {
+describe('ReactComponent', () => {
+  beforeEach(() => {
     React = require('React');
     ReactDOM = require('ReactDOM');
     ReactTestUtils = require('ReactTestUtils');
   });
 
-  it('should throw on invalid render targets', function() {
+  it('should throw on invalid render targets', () => {
     var container = document.createElement('div');
     // jQuery objects are basically arrays; people often pass them in by mistake
     expect(function() {
@@ -38,80 +38,125 @@ describe('ReactComponent', function() {
     );
   });
 
-  it('should throw when supplying a ref outside of render method', function() {
+  it('should throw when supplying a ref outside of render method', () => {
     var instance = <div ref="badDiv" />;
     expect(function() {
       instance = ReactTestUtils.renderIntoDocument(instance);
     }).toThrow();
   });
 
-  it('should support refs on owned components', function() {
+  it('should warn when children are mutated during render', () => {
+    spyOn(console, 'error');
+    function Wrapper(props) {
+      props.children[1] = <p key={1} />; // Mutation is illegal
+      return <div>{props.children}</div>;
+    }
+    expect(() => {
+      ReactTestUtils.renderIntoDocument(
+        <Wrapper>
+          <span key={0}/>
+          <span key={1}/>
+          <span key={2}/>
+        </Wrapper>
+      );
+    }).toThrowError(/Cannot assign to read only property.*/);
+  });
+
+  it('should warn when children are mutated during update', () => {
+    spyOn(console, 'error');
+
+    class Wrapper extends React.Component {
+      componentDidMount() {
+        this.props.children[1] = <p key={1} />; // Mutation is illegal
+        this.forceUpdate();
+      }
+
+      render() {
+        return <div>{this.props.children}</div>;
+      }
+    }
+
+    expect(() => {
+      ReactTestUtils.renderIntoDocument(
+        <Wrapper>
+          <span key={0}/>
+          <span key={1}/>
+          <span key={2}/>
+        </Wrapper>
+      );
+    }).toThrowError(/Cannot assign to read only property.*/);
+  });
+
+  it('should support refs on owned components', () => {
     var innerObj = {};
     var outerObj = {};
 
-    var Wrapper = React.createClass({
-
-      getObject: function() {
+    class Wrapper extends React.Component {
+      getObject = () => {
         return this.props.object;
-      },
+      };
 
-      render: function() {
+      render() {
         return <div>{this.props.children}</div>;
-      },
+      }
+    }
 
-    });
-
-    var Component = React.createClass({
-      render: function() {
+    class Component extends React.Component {
+      render() {
         var inner = <Wrapper object={innerObj} ref="inner" />;
         var outer = <Wrapper object={outerObj} ref="outer">{inner}</Wrapper>;
         return outer;
-      },
-      componentDidMount: function() {
+      }
+
+      componentDidMount() {
         expect(this.refs.inner.getObject()).toEqual(innerObj);
         expect(this.refs.outer.getObject()).toEqual(outerObj);
-      },
-    });
+      }
+    }
 
     var instance = <Component />;
     instance = ReactTestUtils.renderIntoDocument(instance);
   });
 
-  it('should not have refs on unmounted components', function() {
-    var Parent = React.createClass({
-      render: function() {
+  it('should not have refs on unmounted components', () => {
+    class Parent extends React.Component {
+      render() {
         return <Child><div ref="test" /></Child>;
-      },
-      componentDidMount: function() {
+      }
+
+      componentDidMount() {
         expect(this.refs && this.refs.test).toEqual(undefined);
-      },
-    });
-    var Child = React.createClass({
-      render: function() {
+      }
+    }
+
+    class Child extends React.Component {
+      render() {
         return <div />;
-      },
-    });
+      }
+    }
 
     var instance = <Parent child={<span />} />;
     instance = ReactTestUtils.renderIntoDocument(instance);
   });
 
-  it('should support new-style refs', function() {
+  it('should support new-style refs', () => {
     var innerObj = {};
     var outerObj = {};
 
-    var Wrapper = React.createClass({
-      getObject: function() {
+    class Wrapper extends React.Component {
+      getObject = () => {
         return this.props.object;
-      },
-      render: function() {
+      };
+
+      render() {
         return <div>{this.props.children}</div>;
-      },
-    });
+      }
+    }
 
     var mounted = false;
-    var Component = React.createClass({
-      render: function() {
+
+    class Component extends React.Component {
+      render() {
         var inner = <Wrapper object={innerObj} ref={(c) => this.innerRef = c} />;
         var outer = (
           <Wrapper object={outerObj} ref={(c) => this.outerRef = c}>
@@ -119,37 +164,41 @@ describe('ReactComponent', function() {
           </Wrapper>
         );
         return outer;
-      },
-      componentDidMount: function() {
+      }
+
+      componentDidMount() {
         expect(this.innerRef.getObject()).toEqual(innerObj);
         expect(this.outerRef.getObject()).toEqual(outerObj);
         mounted = true;
-      },
-    });
+      }
+    }
 
     var instance = <Component />;
     instance = ReactTestUtils.renderIntoDocument(instance);
     expect(mounted).toBe(true);
   });
 
-  it('should support new-style refs with mixed-up owners', function() {
-    var Wrapper = React.createClass({
-      getTitle: function() {
+  it('should support new-style refs with mixed-up owners', () => {
+    class Wrapper extends React.Component {
+      getTitle = () => {
         return this.props.title;
-      },
-      render: function() {
+      };
+
+      render() {
         return this.props.getContent();
-      },
-    });
+      }
+    }
 
     var mounted = false;
-    var Component = React.createClass({
-      getInner: function() {
+
+    class Component extends React.Component {
+      getInner = () => {
         // (With old-style refs, it's impossible to get a ref to this div
         // because Wrapper is the current owner when this function is called.)
         return <div title="inner" ref={(c) => this.innerRef = c} />;
-      },
-      render: function() {
+      };
+
+      render() {
         return (
           <Wrapper
             title="wrapper"
@@ -157,41 +206,45 @@ describe('ReactComponent', function() {
             getContent={this.getInner}
             />
         );
-      },
-      componentDidMount: function() {
+      }
+
+      componentDidMount() {
         // Check .props.title to make sure we got the right elements back
         expect(this.wrapperRef.getTitle()).toBe('wrapper');
         expect(ReactDOM.findDOMNode(this.innerRef).title).toBe('inner');
         mounted = true;
-      },
-    });
+      }
+    }
 
     var instance = <Component />;
     instance = ReactTestUtils.renderIntoDocument(instance);
     expect(mounted).toBe(true);
   });
 
-  it('should call refs at the correct time', function() {
+  it('should call refs at the correct time', () => {
     var log = [];
 
-    var Inner = React.createClass({
-      render: function() {
+    class Inner extends React.Component {
+      render() {
         log.push(`inner ${this.props.id} render`);
         return <div />;
-      },
-      componentDidMount: function() {
-        log.push(`inner ${this.props.id} componentDidMount`);
-      },
-      componentDidUpdate: function() {
-        log.push(`inner ${this.props.id} componentDidUpdate`);
-      },
-      componentWillUnmount: function() {
-        log.push(`inner ${this.props.id} componentWillUnmount`);
-      },
-    });
+      }
 
-    var Outer = React.createClass({
-      render: function() {
+      componentDidMount() {
+        log.push(`inner ${this.props.id} componentDidMount`);
+      }
+
+      componentDidUpdate() {
+        log.push(`inner ${this.props.id} componentDidUpdate`);
+      }
+
+      componentWillUnmount() {
+        log.push(`inner ${this.props.id} componentWillUnmount`);
+      }
+    }
+
+    class Outer extends React.Component {
+      render() {
         return (
           <div>
             <Inner id={1} ref={(c) => {
@@ -202,17 +255,20 @@ describe('ReactComponent', function() {
             }}/>
           </div>
         );
-      },
-      componentDidMount: function() {
+      }
+
+      componentDidMount() {
         log.push('outer componentDidMount');
-      },
-      componentDidUpdate: function() {
+      }
+
+      componentDidUpdate() {
         log.push('outer componentDidUpdate');
-      },
-      componentWillUnmount: function() {
+      }
+
+      componentWillUnmount() {
         log.push('outer componentWillUnmount');
-      },
-    });
+      }
+    }
 
     // mount, update, unmount
     var el = document.createElement('div');
@@ -254,7 +310,7 @@ describe('ReactComponent', function() {
     /* eslint-enable indent */
   });
 
-  it('fires the callback after a component is rendered', function() {
+  it('fires the callback after a component is rendered', () => {
     var callback = jest.fn();
     var container = document.createElement('div');
     ReactDOM.render(<div />, container, callback);
@@ -265,7 +321,7 @@ describe('ReactComponent', function() {
     expect(callback.mock.calls.length).toBe(3);
   });
 
-  it('throws usefully when rendering badly-typed elements', function() {
+  it('throws usefully when rendering badly-typed elements', () => {
     spyOn(console, 'error');
 
     var X = undefined;

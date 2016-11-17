@@ -16,9 +16,9 @@ var ReactDOM;
 
 var TestComponent;
 
-describe('ReactCompositeComponent-state', function() {
+describe('ReactCompositeComponent-state', () => {
 
-  beforeEach(function() {
+  beforeEach(() => {
     React = require('React');
 
     ReactDOM = require('ReactDOM');
@@ -126,7 +126,7 @@ describe('ReactCompositeComponent-state', function() {
     });
   });
 
-  it('should support setting state', function() {
+  it('should support setting state', () => {
     var container = document.createElement('div');
     document.body.appendChild(container);
 
@@ -216,26 +216,28 @@ describe('ReactCompositeComponent-state', function() {
     ].join('\n'));
   });
 
-  it('should batch unmounts', function() {
+  it('should batch unmounts', () => {
     var outer;
-    var Inner = React.createClass({
-      render: function() {
+
+    class Inner extends React.Component {
+      render() {
         return <div />;
-      },
-      componentWillUnmount: function() {
+      }
+
+      componentWillUnmount() {
         // This should get silently ignored (maybe with a warning), but it
         // shouldn't break React.
         outer.setState({showInner: false});
-      },
-    });
-    var Outer = React.createClass({
-      getInitialState: function() {
-        return {showInner: true};
-      },
-      render: function() {
+      }
+    }
+
+    class Outer extends React.Component {
+      state = {showInner: true};
+
+      render() {
         return <div>{this.state.showInner && <Inner />}</div>;
-      },
-    });
+      }
+    }
 
     var container = document.createElement('div');
     outer = ReactDOM.render(<Outer />, container);
